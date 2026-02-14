@@ -1,58 +1,63 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.staticfiles import StaticFiles
-import shutil
-import os
 from fastapi.responses import HTMLResponse
+import boto3
+import os
 
 app = FastAPI()
 
-# Create media folder if it doesn't exist
-if not os.path.exists("media"):
-    os.makedirs("media")
+# Load environment variables
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.getenv("AWS_REGION")
+S3_BUCKET = os.getenv("S3_BUCKET")
 
-app.mount("/media", StaticFiles(directory="media"), name="media")
+# Initialize S3 client
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=AWS_REGION
+)
 
 @app.get("/")
 def home():
-    return {"message": "Personal Cloud Photos API is running"}
+    return {"message": "Personal Cloud Photos API (S3 version) is running"}
 
+# STEP 5 — Upload to S3 instead of local disk
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    file_path = f"media/{file.filename}"
+    s3.upload_fileobj(
+        file.file,
+        S3_BUCKET,
+        file.filename,
+        ExtraArgs={"ContentType": file.content_type}
+    )
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    return {"filename": file.filename, "status": "uploaded to S3 successfully"}
 
-    return {"filename": file.filename, "status": "uploaded successfully"}
-
-@app.get("/files")
-def list_files():
-    files = os.listdir("media")
-    file_urls = [f"http://127.0.0.1:8000/media/{file}" for file in files]
-    return {"files": file_urls}
-
-
-
-
+# STEP 6 — List files from S3
 @app.get("/gallery", response_class=HTMLResponse)
 def gallery():
-    files = []
-    for filename in os.listdir("media"):
-        path = os.path.join("media", filename)
-        created = os.path.getctime(path)
-        files.append({
-            "name": filename,
-            "created": created
-        })
+    response = s3.list_objects_v2(Bucket=S3_BUCKET)
 
+    files = []
+
+    if "Contents" in response:
+        for obj in response["Contents"]:
+            files.append({
+                "name": obj["Key"],
+                "created": obj["LastModified"]
+            })
+
+    # Sort newest first
     files.sort(key=lambda x: x["created"], reverse=True)
 
     image_tags = ""
-    
+
     for file in files:
-        image_url = f"/media/{file['name']}"
+        image_url = f"https://{S3_BUCKET}.s3.{AWS_REGION}.amazonaws.com/{file['name']}"
         image_tags += f'<img src="{image_url}" />'
-    
+
     html_content = f"""
     <html>
         <head>
@@ -83,7 +88,7 @@ def gallery():
             </style>
         </head>
         <body>
-            <h1>My Gallery</h1>
+            <h1>My Gallery (S3)</h1>
             <form action="/upload" method="post" enctype="multipart/form-data" style="margin:20px;">
                 <input type="file" name="file">
                 <button type="submit">Upload</button>
@@ -94,5 +99,5 @@ def gallery():
         </body>
     </html>
     """
-    
+
     return html_content
