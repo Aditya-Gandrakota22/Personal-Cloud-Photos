@@ -5,11 +5,16 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import os
-from .database import SessionLocal
+from .database import SessionLocal, get_db
 from .models import User
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcr"
+    # Bcrypt has a maximum password length of 72 bytes
+    # Truncate to be safe
+    password_bytes = password.encode('utf-8')[:72]
+    return pwd_context.hash(password_bytes.decode('utf-8'))
+ypt"], deprecated="auto")
 
 # JWT settings
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -23,12 +28,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # Password hashing functions
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt"""
-    # Bcrypt has a maximum password length of 72 bytes
-    # Truncate to be safe
-    password_bytes = password.encode('utf-8')[:72]
-    return pwd_context.hash(password_bytes.decode('utf-8'))
-
+    """Hash a password using bcrypt""
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
     return pwd_context.verify(plain_password, hashed_password)
