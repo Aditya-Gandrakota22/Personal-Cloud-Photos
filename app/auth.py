@@ -9,12 +9,15 @@ from .database import SessionLocal, get_db
 from .models import User
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcr"
-    # Bcrypt has a maximum password length of 72 bytes
-    # Truncate to be safe
-    password_bytes = password.encode('utf-8')[:72]
-    return pwd_context.hash(password_bytes.decode('utf-8'))
-ypt"], deprecated="auto")
+# Password hashing context
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto"
+)
+
+def hash_password(password: str) -> str:
+    password_bytes = password.encode("utf-8")[:72]
+    return pwd_context.hash(password_bytes.decode("utf-8"))
 
 # JWT settings
 SECRET_KEY = os.getenv("SECRET_KEY")
