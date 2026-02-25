@@ -6,7 +6,7 @@ import boto3
 import os
 
 # Database and Models
-from .database import engine, Base, SessionLocal
+from .database import engine, Base, SessionLocal, get_db
 from .models import User, Photo
 from .auth import hash_password, verify_password, create_access_token, get_current_user
 
