@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import boto3
 import os
-
+from fastapi.security import OAuth2PasswordRequestForm
 # Database and Models
 from .database import engine, Base, SessionLocal, get_db
 from .models import User, Photo
@@ -60,10 +60,17 @@ def register(user: UserRegister, db: Session = Depends(get_db)):
 
 # STEP 5: Login Endpoint
 @app.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    # IMPORTANT: OAuth uses "username", not "email"
+    email = form_data.username
+    password = form_data.password
 
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
+    db_user = db.query(User).filter(User.email == email).first()
+
+    if not db_user or not verify_password(password, db_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
